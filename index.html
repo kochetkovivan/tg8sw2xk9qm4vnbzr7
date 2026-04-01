@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>TG Swiper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #08080f;
+    --bg-card: #12121e;
+    --bg-card-alt: #181830;
+    --accent-keep: #22d68a;
+    --accent-remove: #ff4a6e;
+    --accent-muted: #5855eb;
+    --text-primary: #e8e6f0;
+    --text-secondary: #7a789a;
+    --text-username: #8b88ff;
+    --radius: 20px;
+    --card-width: min(380px, 88vw);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(88,85,235,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(34,214,138,0.05) 0%, transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; min-height: 100dvh; }
+
+  .header { width: 100%; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo span { color: var(--accent-muted); }
+  .header-stats { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text-secondary); display: flex; gap: 12px; }
+  .stat-good { color: var(--accent-keep); }
+  .stat-bad { color: var(--accent-remove); }
+
+  .progress-wrap { width: calc(100% - 48px); margin: 0 24px 16px; }
+  .progress-info { display: flex; justify-content: space-between; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .progress-bar { width: 100%; height: 3px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent-muted), var(--accent-keep)); transition: width 0.5s cubic-bezier(.4,1,.6,1); }
+
+  .card-area { position: relative; width: var(--card-width); height: 500px; margin-bottom: 20px; }
+
+  .card {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    border-radius: var(--radius); background: var(--bg-card); overflow: hidden;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+    touch-action: none; will-change: transform;
+    transition: transform 0.4s cubic-bezier(.4,1,.6,1), opacity 0.4s ease;
+  }
+  .card.behind { transform: scale(0.94) translateY(12px); opacity: 0.4; pointer-events: none; }
+  .card.dragging { transition: none; cursor: grabbing; }
+  .card.exit-left { transform: translateX(-140vw) rotate(-25deg) !important; opacity: 0 !important; transition: all 0.4s ease-out !important; }
+  .card.exit-right { transform: translateX(140vw) rotate(25deg) !important; opacity: 0 !important; transition: all 0.4s ease-out !important; }
+
+  .card-avatar { width: 100%; aspect-ratio: 1; background: var(--bg-card-alt); position: relative; overflow: hidden; }
+  .card-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card-avatar-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 56px; font-weight: 800; color: rgba(255,255,255,0.15); background: linear-gradient(135deg, var(--bg-card-alt), #1e1e40); }
+  .card-avatar::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 60%; pointer-events: none; background: linear-gradient(transparent, var(--bg-card)); }
+
+  .card-info { padding: 16px 22px 22px; position: relative; }
+  .card-username { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text-username); margin-bottom: 6px; letter-spacing: 0.3px; }
+  .card-name { font-size: 20px; font-weight: 700; line-height: 1.25; margin-bottom: 8px; color: var(--text-primary); }
+  .card-desc { font-size: 13.5px; color: var(--text-secondary); line-height: 1.55; max-height: 62px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+
+  .swipe-label { position: absolute; top: 20px; z-index: 10; padding: 8px 18px; border-radius: 10px; font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; letter-spacing: 2px; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+  .swipe-label.keep { left: 20px; color: var(--accent-keep); background: rgba(34,214,138,0.15); border: 1.5px solid rgba(34,214,138,0.4); transform: rotate(-12deg); }
+  .swipe-label.remove { right: 20px; color: var(--accent-remove); background: rgba(255,74,110,0.15); border: 1.5px solid rgba(255,74,110,0.4); transform: rotate(12deg); }
+  .swipe-label.visible { opacity: 1; }
+
+  .buttons { display: flex; gap: 28px; margin-bottom: 12px; }
+  .btn-swipe { width: 64px; height: 64px; border-radius: 50%; border: 2px solid; background: transparent; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .btn-swipe:active { transform: scale(0.9); }
+  .btn-remove { border-color: rgba(255,74,110,0.35); color: var(--accent-remove); }
+  .btn-remove:hover { background: rgba(255,74,110,0.12); border-color: var(--accent-remove); }
+  .btn-keep { border-color: rgba(34,214,138,0.35); color: var(--accent-keep); }
+  .btn-keep:hover { background: rgba(34,214,138,0.12); border-color: var(--accent-keep); }
+
+  .hint { font-size: 11px; color: var(--text-secondary); margin-bottom: 24px; font-family: 'DM Mono', monospace; opacity: 0.5; }
+
+  .screen-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; gap: 16px; text-align: center; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--accent-muted); border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .done-icon { font-size: 56px; }
+  .done-title { font-size: 28px; font-weight: 800; }
+  .done-stats { display: flex; gap: 40px; margin: 8px 0 16px; }
+  .done-stat { text-align: center; }
+  .done-stat-num { font-size: 40px; font-weight: 800; }
+  .done-stat-label { font-size: 12px; color: var(--text-secondary); font-family: 'DM Mono', monospace; }
+  .done-buttons { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 320px; }
+  .btn-export { padding: 14px; border-radius: 14px; border: none; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform 0.2s; }
+  .btn-export:active { transform: scale(0.97); }
+  .btn-export-keep { background: rgba(34,214,138,0.15); color: var(--accent-keep); }
+  .btn-export-remove { background: rgba(255,74,110,0.1); color: var(--accent-remove); }
+  .btn-export-all { background: rgba(88,85,235,0.15); color: var(--accent-muted); }
+  .btn-secondary { padding: 12px 24px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; color: var(--text-secondary); font-family: 'Outfit', sans-serif; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+  .btn-secondary:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.15); }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 10px 20px; border-radius: 10px; font-family: 'DM Mono', monospace; font-size: 12px; background: var(--bg-card); color: var(--text-primary); box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.06); opacity: 0; transition: all 0.3s ease; z-index: 100; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="app" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+//  CONFIG
+// ============================================================
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbz_zJfL1ctnK7q-2mDcxgYMLIZQHm77NEzZMPt0Tdl51-ppcQLs3B5ss_PnZszvdXwoCQ/exec';
+const SHEET_NAME = 'Results3';
+
+const state = {
+  screen: 'loading',
+  allItems: [],
+  items: [],
+  currentIndex: 0,
+  keepCount: 0,
+  removeCount: 0,
+  results: { keep: [], remove: [] },
+};
+
+// ============================================================
+//  GOOGLE SHEETS — запись
+// ============================================================
+async function sendToSheets(item, status) {
+  try {
+    await fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: item.username,
+        name: item.name,
+        description: item.description,
+        status: status,
+        sheet: SHEET_NAME,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch (e) {
+    console.warn('Sheets write error:', e);
+  }
+}
+
+// ============================================================
+//  GOOGLE SHEETS — чтение прогресса
+// ============================================================
+async function loadProgressFromSheets() {
+  try {
+    const resp = await fetch(SHEETS_URL + '?sheet=' + SHEET_NAME);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    return data.reviewed || [];
+  } catch (e) {
+    console.warn('Sheets read error, starting fresh:', e);
+    return [];
+  }
+}
+
+// ============================================================
+//  TOAST
+// ============================================================
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ============================================================
+//  DATA
+// ============================================================
+async function loadData() {
+  const resp = await fetch('data.json');
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  state.allItems = await resp.json();
+}
+
+// ============================================================
+//  SWIPE
+// ============================================================
+function handleSwipe(action) {
+  if (state.currentIndex >= state.items.length) return;
+
+  const item = state.items[state.currentIndex];
+  state.results[action].push(item);
+
+  if (action === 'keep') state.keepCount++;
+  else state.removeCount++;
+
+  sendToSheets(item, action === 'keep' ? 'GOOD' : 'BAD');
+
+  const topCard = document.querySelector('.card:not(.behind)');
+  if (topCard) topCard.classList.add(action === 'keep' ? 'exit-right' : 'exit-left');
+
+  state.currentIndex++;
+
+  setTimeout(() => {
+    if (state.currentIndex >= state.items.length) {
+      state.screen = 'done';
+    }
+    render();
+  }, 400);
+}
+
+// ============================================================
+//  DRAG
+// ============================================================
+function initDrag(card) {
+  let ox = 0, oy = 0, active = false, sx, sy;
+
+  function start(cx, cy) { active = true; sx = cx; sy = cy; card.classList.add('dragging'); }
+  function move(cx, cy) {
+    if (!active) return;
+    ox = cx - sx; oy = (cy - sy) * 0.3;
+    card.style.transform = `translate(${ox}px,${oy}px) rotate(${ox*0.07}deg)`;
+    const kl = card.querySelector('.swipe-label.keep');
+    const rl = card.querySelector('.swipe-label.remove');
+    if (kl) kl.classList.toggle('visible', ox > 50);
+    if (rl) rl.classList.toggle('visible', ox < -50);
+  }
+  function end() {
+    if (!active) return;
+    active = false; card.classList.remove('dragging');
+    if (Math.abs(ox) > 100) { handleSwipe(ox > 0 ? 'keep' : 'remove'); }
+    else {
+      card.style.transform = '';
+      const kl = card.querySelector('.swipe-label.keep');
+      const rl = card.querySelector('.swipe-label.remove');
+      if (kl) kl.classList.remove('visible');
+      if (rl) rl.classList.remove('visible');
+    }
+    ox = 0; oy = 0;
+  }
+
+  card.addEventListener('mousedown', e => {
+    e.preventDefault(); start(e.clientX, e.clientY);
+    const mm = e2 => move(e2.clientX, e2.clientY);
+    const mu = () => { end(); window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
+    window.addEventListener('mousemove', mm); window.addEventListener('mouseup', mu);
+  });
+  card.addEventListener('touchstart', e => { const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
+  card.addEventListener('touchmove', e => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
+  card.addEventListener('touchend', () => end());
+}
+
+// ============================================================
+//  EXPORT
+// ============================================================
+function exportCSV(list, filename) {
+  const status = filename.includes('keep') ? 'GOOD' : 'BAD';
+  const csv = 'username|name|description|status\n' + list.map(i => `${i.username}|${i.name}|${i.description}|${status}`).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'})); a.download = filename; a.click();
+}
+function exportAll() {
+  const csv = 'username|name|description|status\n' +
+    [...state.results.keep.map(i => `${i.username}|${i.name}|${i.description}|GOOD`),
+     ...state.results.remove.map(i => `${i.username}|${i.name}|${i.description}|BAD`)].join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'})); a.download = 'results_all.csv'; a.click();
+}
+
+// ============================================================
+//  RENDER
+// ============================================================
+function renderCard(item, behind) {
+  const ini = item.name ? item.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() : '?';
+  const av = item.avatar || '';
+  return `<div class="card ${behind?'behind':''}" style="cursor:${behind?'default':'grab'}">
+    <div class="swipe-label keep">GOOD</div><div class="swipe-label remove">BAD</div>
+    <div class="card-avatar">${av
+      ? `<img src="${av}" alt="" draggable="false" onerror="this.parentElement.innerHTML='<div class=card-avatar-fallback>${ini}</div>'">`
+      : `<div class="card-avatar-fallback">${ini}</div>`}</div>
+    <div class="card-info">
+      <div class="card-username">${item.username}</div>
+      <div class="card-name">${item.name}</div>
+      <div class="card-desc">${item.description}</div>
+    </div></div>`;
+}
+
+function render() {
+  const app = document.getElementById('app');
+
+  if (state.screen === 'loading') {
+    app.innerHTML = '<div class="screen-center"><div style="color:var(--text-secondary);font-size:14px"><span class="spinner"></span>Загрузка и синхронизация...</div></div>';
+    return;
+  }
+
+  if (state.screen === 'error') {
+    app.innerHTML = '<div class="screen-center"><div style="font-size:48px">😕</div><div style="font-size:20px;font-weight:700">Ошибка загрузки</div><div style="font-size:14px;color:var(--text-secondary)">Не удалось загрузить data.json</div><button class="btn-secondary" onclick="location.reload()">Попробовать снова</button></div>';
+    return;
+  }
+
+  if (state.screen === 'swipe') {
+    const total = state.allItems.length;
+    const reviewed = total - state.items.length + state.currentIndex;
+    const pct = (reviewed / total * 100).toFixed(1);
+    const cur = state.items[state.currentIndex];
+    const nxt = state.currentIndex + 1 < state.items.length ? state.items[state.currentIndex + 1] : null;
+
+    app.innerHTML = `
+      <div class="header"><div class="logo"><span>TG</span> Swiper</div>
+        <div class="header-stats"><span class="stat-good">✓ ${state.keepCount}</span><span class="stat-bad">✗ ${state.removeCount}</span></div></div>
+      <div class="progress-wrap"><div class="progress-info"><span>${reviewed} / ${total}</span><span>${pct}%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div></div>
+      <div class="card-area">${nxt?renderCard(nxt,true):''}${cur?renderCard(cur,false):''}</div>
+      <div class="buttons"><button class="btn-swipe btn-remove" id="bR">✗</button><button class="btn-swipe btn-keep" id="bK">✓</button></div>
+      <div class="hint">← BAD · GOOD →</div>`;
+    const top = document.querySelector('.card:not(.behind)');
+    if (top) initDrag(top);
+    document.getElementById('bR').onclick = () => handleSwipe('remove');
+    document.getElementById('bK').onclick = () => handleSwipe('keep');
+    document.onkeydown = e => { if(e.key==='ArrowLeft') handleSwipe('remove'); if(e.key==='ArrowRight') handleSwipe('keep'); };
+    return;
+  }
+
+  if (state.screen === 'done') {
+    document.onkeydown = null;
+    app.innerHTML = `<div class="screen-center">
+      <div class="done-icon">🎊</div><div class="done-title">Готово!</div>
+      <div class="done-stats">
+        <div class="done-stat"><div class="done-stat-num" style="color:var(--accent-keep)">${state.keepCount}</div><div class="done-stat-label">GOOD</div></div>
+        <div class="done-stat"><div class="done-stat-num" style="color:var(--accent-remove)">${state.removeCount}</div><div class="done-stat-label">BAD</div></div>
+      </div>
+      <div style="font-size:12px;color:var(--accent-keep);font-family:'DM Mono',monospace;margin-bottom:8px">✓ Результаты в Google Таблице (${SHEET_NAME})</div>
+      <div class="done-buttons">
+        <button class="btn-export btn-export-all" onclick="exportAll()">Скачать всё с GOOD/BAD</button>
+        <button class="btn-export btn-export-keep" onclick="exportCSV(state.results.keep,'kept.csv')">Скачать GOOD (${state.results.keep.length})</button>
+        <button class="btn-export btn-export-remove" onclick="exportCSV(state.results.remove,'removed.csv')">Скачать BAD (${state.results.remove.length})</button>
+        <button class="btn-secondary" style="width:100%;margin-top:8px" onclick="location.reload()">Обновить</button>
+      </div></div>`;
+  }
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+(async () => {
+  render();
+  try {
+    await loadData();
+
+    const reviewed = await loadProgressFromSheets();
+    const reviewedUsernames = new Set(reviewed.map(r => r.username));
+
+    state.keepCount = reviewed.filter(r => r.status === 'GOOD').length;
+    state.removeCount = reviewed.filter(r => r.status === 'BAD').length;
+
+    state.items = state.allItems.filter(item => !reviewedUsernames.has(item.username));
+    state.currentIndex = 0;
+
+    if (reviewed.length > 0) {
+      showToast(`Синхронизировано: ${reviewed.length} просмотрено, осталось ${state.items.length}`);
+    }
+
+    state.screen = state.items.length === 0 ? 'done' : 'swipe';
+  } catch (e) {
+    console.error(e);
+    state.screen = 'error';
+  }
+  render();
+})();
+</script>
+</body>
+</html>
